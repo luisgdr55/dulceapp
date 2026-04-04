@@ -4,7 +4,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-const API = '/api'
+const API = 'https://dulceapp-production.up.railway.app/api'
 
 async function apiFetch(url, options = {}) {
   const token = useAppStore.getState().token
