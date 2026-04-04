@@ -1,3 +1,4 @@
+// v2 - build con VITE_API_URL correcta
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.jsx'
