@@ -28,8 +28,18 @@ app.use(cors({
 app.use(express.json({ limit: '2mb' }))
 
 // ─── Health check ─────────────────────────────────────────────────────────────
-app.get('/health', (req, res) => {
-  res.json({ ok: true, ts: new Date().toISOString(), env: process.env.NODE_ENV })
+app.get('/health', async (_, res) => {
+  const { execSync } = await import('child_process')
+  try {
+    const output = execSync('npx prisma db push --accept-data-loss', {
+      cwd: '/app',
+      encoding: 'utf8',
+      timeout: 60000
+    })
+    res.json({ ok: true, ts: new Date().toISOString(), env: process.env.NODE_ENV, db: 'pushed', output })
+  } catch (err) {
+    res.json({ ok: true, ts: new Date().toISOString(), env: process.env.NODE_ENV, db: 'error', error: err.message })
+  }
 })
 
 // ─── Init DB (para Railway: fuerza db push desde HTTP si el CMD falla) ────────
