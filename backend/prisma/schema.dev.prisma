@@ -1,0 +1,318 @@
+// DULCEAPP — Schema Prisma multi-tenant
+// VERSION: SQLite (desarrollo local)
+// Para producción con PostgreSQL: cambiar provider a "postgresql"
+//   y los campos String marcados con "// JSON en postgres" volver a Json
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// CAPA 0: PLATAFORMA GLOBAL
+// ─────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  nombre       String
+  apellido     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships      WorkspaceMember[]
+  aiConversations  AIConversation[]
+  auditLogs        AuditLog[]
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  slug      String   @unique
+  nombre    String
+  plan      String   @default("FREE")
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members          WorkspaceMember[]
+  businessConfig   BusinessConfig?
+  tasasBCV         TasaBCV[]
+  backupConfig     BackupConfig?
+  ingredientes     Ingrediente[]
+  recetas          Receta[]
+  pedidos          Pedido[]
+  notificaciones   Notificacion[]
+  auditLogs        AuditLog[]
+  aiConversations  AIConversation[]
+  telegramSession  TelegramSession?
+}
+
+model WorkspaceMember {
+  id          String   @id @default(cuid())
+  userId      String
+  workspaceId String
+  role        String   @default("EDITOR")
+  createdAt   DateTime @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+}
+
+// ─────────────────────────────────────────────
+// CAPA 1: CONFIGURACIÓN DEL NEGOCIO
+// ─────────────────────────────────────────────
+
+model BusinessConfig {
+  id                String    @id @default(cuid())
+  workspaceId       String    @unique
+  nombre            String
+  apellido          String?
+  negocio           String
+  ciudad            String?
+  email             String?
+  telefono          String?
+  monedaPrincipal   String    @default("EUR")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model TasaBCV {
+  id          String    @id @default(cuid())
+  workspaceId String
+  tasa        Float
+  fecha       DateTime  @default(now())
+  esCurrent   Boolean   @default(false)
+  fuente      String    @default("manual")
+  createdAt   DateTime  @default(now())
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, esCurrent])
+}
+
+model BackupConfig {
+  id                   String    @id @default(cuid())
+  workspaceId          String    @unique
+  autoBackup           Boolean   @default(false)
+  frecuencia           String    @default("semanal")
+  horaBackup           String    @default("02:00")
+  diaSemana            Int       @default(1)
+  ultimoBackup         DateTime?
+  ultimoBackupArchivo  String?
+  updatedAt            DateTime  @updatedAt
+
+  workspace            Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────
+// CAPA 2: INVENTARIO Y RECETARIO
+// ─────────────────────────────────────────────
+
+model Ingrediente {
+  id              String    @id @default(cuid())
+  workspaceId     String
+  nombre          String
+  categoria       String?
+  unidad          String
+  cantidadActual  Float     @default(0)
+  cantidadMinima  Float     @default(0)
+  precioEur       Float     @default(0)
+  proveedor       String?
+  notas           String?
+  esAccesorio     Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  workspace       Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  recetaItems     RecetaIngrediente[]
+
+  @@index([workspaceId])
+}
+
+model Receta {
+  id                   String    @id @default(cuid())
+  workspaceId          String
+  nombre               String
+  descripcion          String?
+  categoria            String?
+  imagenUrl            String?
+  porciones            Int       @default(1)
+  tiempoPrep           Int?
+  costoIngredientesEur Float     @default(0)
+  costoGasEur          Float     @default(0)
+  costoEmpaqueEur      Float     @default(0)
+  costoTotalEur        Float     @default(0)
+  precioVentaEur       Float     @default(0)
+  margenGanancia       Float     @default(0)
+  notas                String?
+  activa               Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  workspace           Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ingredientes        RecetaIngrediente[]
+  variantes           RecetaVariante[]
+  pedidos             Pedido[]
+
+  @@index([workspaceId])
+}
+
+model RecetaIngrediente {
+  id            String      @id @default(cuid())
+  recetaId      String
+  ingredienteId String
+  cantidad      Float
+  unidad        String
+
+  receta        Receta      @relation(fields: [recetaId], references: [id], onDelete: Cascade)
+  ingrediente   Ingrediente @relation(fields: [ingredienteId], references: [id], onDelete: Cascade)
+
+  @@unique([recetaId, ingredienteId])
+}
+
+model RecetaVariante {
+  id          String    @id @default(cuid())
+  recetaId    String
+  nombre      String
+  precioEur   Float
+  descripcion String?
+
+  receta      Receta    @relation(fields: [recetaId], references: [id], onDelete: Cascade)
+  pedidos     Pedido[]
+}
+
+// ─────────────────────────────────────────────
+// CAPA 3: PEDIDOS, NOTIFICACIONES Y AUDITORÍA
+// ─────────────────────────────────────────────
+
+model Pedido {
+  id               String   @id @default(cuid())
+  workspaceId      String
+  numeroPedido     String
+  recetaId         String?
+  varianteId       String?
+  cantidad         Int      @default(1)
+  precioUnitarioEur Float   @default(0)
+  totalEur         Float    @default(0)
+  totalBs          Float    @default(0)
+  costoTotalEur    Float    @default(0)
+  gananciaEur      Float    @default(0)
+  clienteNombre    String?
+  clienteTelefono  String?
+  clienteDireccion String?
+  fechaEntrega     DateTime?
+  estado           String   @default("PENDIENTE")
+  tasaBcvUsada     Float    @default(0)
+  notas            String?
+  ventaRapida      Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  receta          Receta?         @relation(fields: [recetaId], references: [id])
+  variante        RecetaVariante? @relation(fields: [varianteId], references: [id])
+  tags            PedidoTag[]
+
+  @@unique([workspaceId, numeroPedido])
+  @@index([workspaceId, estado])
+  @@index([workspaceId, fechaEntrega])
+  @@index([workspaceId, createdAt])
+}
+
+model PedidoTag {
+  id       String @id @default(cuid())
+  pedidoId String
+  tag      String
+
+  pedido   Pedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  @@index([pedidoId])
+}
+
+model Notificacion {
+  id          String    @id @default(cuid())
+  workspaceId String
+  tipo        String
+  titulo      String
+  mensaje     String
+  leida       Boolean   @default(false)
+  referenciaId String?
+  createdAt   DateTime  @default(now())
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, leida])
+}
+
+// Auditoría: quién hizo qué y cuándo
+model AuditLog {
+  id          String    @id @default(cuid())
+  workspaceId String
+  userId      String?
+  canal       String    @default("web")
+  accion      String
+  entidad     String
+  entidadId   String?
+  payload     String?   // JSON serializado (Json en postgres)
+  createdAt   DateTime  @default(now())
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User?     @relation(fields: [userId], references: [id])
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, entidad])
+}
+
+// ─────────────────────────────────────────────
+// CAPA 4: IA Y TELEGRAM
+// ─────────────────────────────────────────────
+
+model AIConversation {
+  id          String    @id @default(cuid())
+  workspaceId String
+  userId      String?
+  canal       String    @default("web")
+  messages    String    @default("[]")  // JSON serializado (Json en postgres)
+  activa      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User?       @relation(fields: [userId], references: [id])
+  actions     AIAction[]
+}
+
+model AIAction {
+  id             String   @id @default(cuid())
+  conversationId String
+  tool           String
+  params         String   // JSON serializado (Json en postgres)
+  resultado      String?  // JSON serializado (Json en postgres)
+  confirmada     Boolean  @default(false)
+  ejecutada      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  conversation   AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+model TelegramSession {
+  id            String    @id @default(cuid())
+  workspaceId   String    @unique
+  chatId        String
+  botToken      String
+  activa        Boolean   @default(true)
+  lastActivity  DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
