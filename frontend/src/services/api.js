@@ -3,7 +3,7 @@
 
 import { useAppStore } from '../stores/appStore.js'
 
-const BASE = 'https://dulceapp-production.up.railway.app/api'
+const BASE = import.meta.env.VITE_API_URL || 'https://dulceapp-production.up.railway.app/api'
 
 async function req(url, options = {}) {
   const token = useAppStore.getState().token
