@@ -32,6 +32,17 @@ app.get('/health', (req, res) => {
   res.json({ ok: true, ts: new Date().toISOString(), env: process.env.NODE_ENV })
 })
 
+// ─── Init DB (para Railway: fuerza db push desde HTTP si el CMD falla) ────────
+app.post('/init-db', async (req, res) => {
+  try {
+    const { execSync } = await import('node:child_process')
+    const output = execSync('npx prisma db push --accept-data-loss', { encoding: 'utf8' })
+    res.json({ ok: true, output })
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message })
+  }
+})
+
 // ─── Rutas de la API ──────────────────────────────────────────────────────────
 app.use('/api/auth',        authRouter)
 app.use('/api/workspaces',  workspacesRouter)
