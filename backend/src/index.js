@@ -28,30 +28,7 @@ app.use(cors({
 app.use(express.json({ limit: '2mb' }))
 
 // ─── Health check ─────────────────────────────────────────────────────────────
-app.get('/health', async (_, res) => {
-  const { execSync } = await import('child_process')
-  try {
-    const output = execSync('npx prisma db push --accept-data-loss', {
-      cwd: '/app',
-      encoding: 'utf8',
-      timeout: 60000
-    })
-    res.json({ ok: true, ts: new Date().toISOString(), env: process.env.NODE_ENV, db: 'pushed', output })
-  } catch (err) {
-    res.json({ ok: true, ts: new Date().toISOString(), env: process.env.NODE_ENV, db: 'error', error: err.message })
-  }
-})
-
-// ─── Init DB (para Railway: fuerza db push desde HTTP si el CMD falla) ────────
-app.post('/init-db', async (req, res) => {
-  try {
-    const { execSync } = await import('node:child_process')
-    const output = execSync('npx prisma db push --accept-data-loss', { encoding: 'utf8' })
-    res.json({ ok: true, output })
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message })
-  }
-})
+app.get('/health', (_, res) => res.json({ ok: true, ts: new Date().toISOString() }))
 
 // ─── Rutas de la API ──────────────────────────────────────────────────────────
 app.use('/api/auth',        authRouter)
