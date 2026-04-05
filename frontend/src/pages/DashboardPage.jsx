@@ -21,6 +21,7 @@ export function DashboardPage() {
   }, [activeWorkspaceId, periodo])
 
   const d = dashboard
+  const tasaEUR = d?.tasaEUR || d?.tasaBCV || 0
 
   return (
     <div style={styles.page}>
@@ -32,7 +33,8 @@ export function DashboardPage() {
           </h1>
           <p style={styles.subtitle}>
             {format(new Date(), "EEEE d 'de' MMMM", { locale: es })}
-            {d?.tasaBCV ? ` · Tasa BCV: ${d.tasaBCV} Bs/€` : ''}
+            {d?.tasaEUR ? ` · €1 = ${d.tasaEUR} Bs` : ''}
+            {d?.tasaUSD ? ` · $1 = ${d.tasaUSD} Bs` : ''}
           </p>
         </div>
         <div style={styles.periodBtns}>
@@ -53,6 +55,7 @@ export function DashboardPage() {
         <MetricCard
           label="Ventas hoy"
           value={`€${(d?.hoy?.ingresosEur || 0).toFixed(2)}`}
+          valueBs={tasaEUR > 0 ? `Bs ${((d?.hoy?.ingresosEur || 0) * tasaEUR).toFixed(0)}` : null}
           sub={`${d?.hoy?.ventas || 0} pedido(s)`}
           color="#7B61C4"
           loading={dashboardLoading}
@@ -60,6 +63,7 @@ export function DashboardPage() {
         <MetricCard
           label={`Ingresos ${periodo}`}
           value={`€${(d?.periodo_stats?.ingresosEur || 0).toFixed(2)}`}
+          valueBs={d?.periodo_stats?.ingresosBs > 0 ? `Bs ${(d.periodo_stats.ingresosBs).toFixed(0)}` : tasaEUR > 0 ? `Bs ${((d?.periodo_stats?.ingresosEur || 0) * tasaEUR).toFixed(0)}` : null}
           sub={d?.periodo_stats?.variacionPct != null
             ? `${d.periodo_stats.variacionPct > 0 ? '↑' : '↓'} ${Math.abs(d.periodo_stats.variacionPct)}% vs período anterior`
             : `${d?.periodo_stats?.ventas || 0} ventas`}
@@ -69,6 +73,7 @@ export function DashboardPage() {
         <MetricCard
           label="Ganancia neta"
           value={`€${(d?.periodo_stats?.gananciaEur || 0).toFixed(2)}`}
+          valueBs={tasaEUR > 0 ? `Bs ${((d?.periodo_stats?.gananciaEur || 0) * tasaEUR).toFixed(0)}` : null}
           sub="después de costos"
           color="#2D6A4F"
           loading={dashboardLoading}
@@ -134,7 +139,10 @@ export function DashboardPage() {
               <div key={r.recetaId} style={styles.topRow}>
                 <span style={styles.topRank}>#{i + 1}</span>
                 <span style={styles.topNombre}>{r.nombre}</span>
-                <span style={styles.topVentas}>{r.ventas} ventas · €{r.gananciaEur.toFixed(0)}</span>
+                <span style={styles.topVentas}>
+                  {r.ventas} ventas · €{r.gananciaEur.toFixed(0)}
+                  {tasaEUR > 0 && ` / Bs ${(r.gananciaEur * tasaEUR).toFixed(0)}`}
+                </span>
               </div>
             ))}
           </div>
@@ -174,13 +182,16 @@ export function DashboardPage() {
   )
 }
 
-function MetricCard({ label, value, sub, color, onClick, loading }) {
+function MetricCard({ label, value, valueBs, sub, color, onClick, loading }) {
   return (
     <div style={{ ...styles.metric, cursor: onClick ? 'pointer' : 'default' }} onClick={onClick}>
       <p style={styles.metricLabel}>{label}</p>
       <p style={{ ...styles.metricValue, color: loading ? '#ccc' : color }}>
         {loading ? '—' : value}
       </p>
+      {!loading && valueBs && (
+        <p style={styles.metricBs}>{valueBs}</p>
+      )}
       <p style={styles.metricSub}>{sub}</p>
     </div>
   )
@@ -215,6 +226,7 @@ const styles = {
   },
   metricLabel: { fontSize: 12, color: '#6b7280', marginBottom: 6 },
   metricValue: { fontSize: 22, fontWeight: 600, lineHeight: 1 },
+  metricBs: { fontSize: 13, color: '#6b7280', fontWeight: 500, marginTop: 3 },
   metricSub: { fontSize: 11, color: '#9ca3af', marginTop: 4 },
   card: {
     background: '#fff',
