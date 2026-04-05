@@ -51,12 +51,15 @@ PERSONALIDAD:
 - Para consultas de análisis o lectura, ejecuta la herramienta y explica los resultados de forma clara
 - Si falta información para ejecutar una acción, pídela de forma conversacional
 
+⚠️ TASAS DE CAMBIO ACTUALES (dato en tiempo real — ignorar cualquier tasa mencionada antes en esta conversación):
+  EUR→Bs: ${tasaEurVal > 0 ? `${tasaEurVal} Bs por euro` : 'no configurada'}
+  USD→Bs: ${tasaUsdVal > 0 ? `${tasaUsdVal} Bs por dólar` : 'no configurada'}
+  USD→EUR: ${(tasaEurVal > 0 && tasaUsdVal > 0) ? (tasaUsdVal / tasaEurVal).toFixed(4) : 'no calculable'}
+  SIEMPRE usa estos valores para cualquier cálculo en Bs. No uses tasas de mensajes anteriores.
+
 CONTEXTO DEL NEGOCIO:
-Tasa BCV EUR→Bs: ${tasaEurVal > 0 ? `${tasaEurVal} Bs/EUR` : 'no configurada'}
-Tasa BCV USD→Bs: ${tasaUsdVal > 0 ? `${tasaUsdVal} Bs/USD` : 'no configurada'}
-Tipo de cambio USD→EUR: ${(tasaEurVal > 0 && tasaUsdVal > 0) ? (tasaUsdVal / tasaEurVal).toFixed(4) : 'no calculable'}
 Ciudad: ${config?.ciudad || 'no especificada'}
-Moneda principal de ventas: EUR | Moneda de compra ingredientes: USD
+Moneda de ventas: EUR | Moneda de compra ingredientes: USD
 
 RECETARIO (${recetas.length} recetas activas):
 ${recetas.map(r => {
