@@ -74,56 +74,85 @@ function PerfilSection({ wid }) {
 
 // ── Tasa BCV ──────────────────────────────────────────────────────────────────
 function TasaBCVSection({ wid }) {
-  const [actual, setActual] = useState(null)
-  const [historial, setHistorial] = useState([])
-  const [tasa, setTasa] = useState('')
+  const [tasas, setTasas] = useState({ actualEUR: null, actualUSD: null, historialEUR: [], historialUSD: [] })
+  const [tasaEur, setTasaEur] = useState('')
+  const [tasaUsd, setTasaUsd] = useState('')
   const [msg, setMsg] = useState(null)
 
   const load = useCallback(() => {
     if (!wid) return
-    workspacesApi.getTasaBCV(wid).then(d => { setActual(d.actual); setHistorial(d.historial || []) }).catch(() => {})
+    workspacesApi.getTasaBCV(wid).then(d => setTasas({
+      actualEUR: d.actualEUR || null,
+      actualUSD: d.actualUSD || null,
+      historialEUR: d.historialEUR || [],
+      historialUSD: d.historialUSD || []
+    })).catch(() => {})
   }, [wid])
 
   useEffect(() => { load() }, [load])
 
-  const save = async () => {
+  const save = async (moneda, valor) => {
     try {
-      await workspacesApi.postTasaBCV(wid, parseFloat(tasa))
-      setTasa('')
-      setMsg({ ok: true, text: 'Tasa actualizada correctamente' })
+      await workspacesApi.postTasaBCV(wid, parseFloat(valor), moneda)
+      moneda === 'EUR' ? setTasaEur('') : setTasaUsd('')
+      setMsg({ ok: true, text: `Tasa ${moneda} actualizada` })
       load()
     } catch (err) { setMsg({ ok: false, text: err.message }) }
     setTimeout(() => setMsg(null), 3000)
   }
 
-  return (
-    <div style={s.section}>
-      <p style={s.sectionTitle}>Tasa BCV (EUR → Bs)</p>
+  const TasaRow = ({ label, actual, valor, setValor, moneda, placeholder }) => (
+    <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 12 }}>
+      <p style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>{label}</p>
       {actual && (
-        <div style={{ fontSize: 14, color: '#374151' }}>
+        <div style={{ fontSize: 14, color: '#374151', marginBottom: 8 }}>
           Tasa actual: <strong style={{ color: '#7B61C4', fontSize: 18 }}>{actual.tasa.toFixed(2)} Bs</strong>
-          <span style={{ marginLeft: 12, fontSize: 12, color: '#9ca3af' }}>
-            actualizada {new Date(actual.fecha).toLocaleDateString('es-VE')}
+          <span style={{ marginLeft: 10, fontSize: 12, color: '#9ca3af' }}>
+            {new Date(actual.fecha).toLocaleDateString('es-VE')}
           </span>
         </div>
       )}
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
         <div style={{ flex: 1 }}>
-          <Field label="Nueva tasa" type="number" value={tasa} onChange={e => setTasa(e.target.value)} placeholder="Ej: 46.50" />
+          <Field label="Nueva tasa" type="number" value={valor} onChange={e => setValor(e.target.value)} placeholder={placeholder} />
         </div>
-        <button style={{ ...pg.btnPrimary, height: 42 }} onClick={save} disabled={!tasa}>Actualizar</button>
+        <button style={{ ...pg.btnPrimary, height: 42 }} onClick={() => save(moneda, valor)} disabled={!valor}>Actualizar</button>
       </div>
+    </div>
+  )
+
+  return (
+    <div style={s.section}>
+      <p style={s.sectionTitle}>Tasas BCV</p>
+      <TasaRow
+        label="EUR → Bs (ventas y pedidos)"
+        actual={tasas.actualEUR}
+        valor={tasaEur} setValor={setTasaEur}
+        moneda="EUR" placeholder="Ej: 46.50"
+      />
+      <TasaRow
+        label="USD → Bs (compra de ingredientes)"
+        actual={tasas.actualUSD}
+        valor={tasaUsd} setValor={setTasaUsd}
+        moneda="USD" placeholder="Ej: 36.50"
+      />
       {msg && <p style={msg.ok ? s.msgOk : s.msgErr}>{msg.text}</p>}
-      {historial.length > 0 && (
-        <div>
-          <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 6 }}>Últimas 10 tasas</p>
-          {historial.slice(0, 10).map(t => (
-            <div key={t.id} style={s.histRow}>
-              <span>{new Date(t.fecha).toLocaleDateString('es-VE')}</span>
-              <span style={{ fontWeight: 600, color: t.esCurrent ? '#7B61C4' : '#374151' }}>
-                {t.tasa.toFixed(2)} Bs {t.esCurrent && <span style={{ fontSize: 11, color: '#7B61C4' }}>(actual)</span>}
-              </span>
-            </div>
+      {(tasas.historialEUR.length > 0 || tasas.historialUSD.length > 0) && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 8 }}>
+          {[{ label: 'Historial EUR', hist: tasas.historialEUR }, { label: 'Historial USD', hist: tasas.historialUSD }].map(({ label, hist }) => (
+            hist.length > 0 && (
+              <div key={label}>
+                <p style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>{label}</p>
+                {hist.slice(0, 8).map(t => (
+                  <div key={t.id} style={s.histRow}>
+                    <span>{new Date(t.fecha).toLocaleDateString('es-VE')}</span>
+                    <span style={{ fontWeight: 600, color: t.esCurrent ? '#7B61C4' : '#374151' }}>
+                      {t.tasa.toFixed(2)} {t.esCurrent && <span style={{ fontSize: 10 }}>✓</span>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )
           ))}
         </div>
       )}

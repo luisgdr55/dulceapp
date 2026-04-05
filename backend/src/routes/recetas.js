@@ -61,7 +61,7 @@ router.post('/', requireWorkspace('EDITOR'), async (req, res) => {
       imagenUrl: z.string().optional(),
       porciones: z.number().int().min(1).default(1),
       tiempoPrep: z.number().int().optional(),
-      costoIngredientesEur: z.number().min(0).default(0),
+      costoIngredientesUsd: z.number().min(0).default(0),
       costoGasEur: z.number().min(0).default(0),
       costoEmpaqueEur: z.number().min(0).default(0),
       precioVentaEur: z.number().min(0).default(0),
@@ -71,7 +71,15 @@ router.post('/', requireWorkspace('EDITOR'), async (req, res) => {
     })
 
     const data = schema.parse(req.body)
-    const costoTotal = data.costoIngredientesEur + data.costoGasEur + data.costoEmpaqueEur
+
+    // Obtener tasas para convertir costo de ingredientes USD → EUR
+    const [tasaUSD, tasaEUR] = await Promise.all([
+      prisma.tasaBCV.findFirst({ where: { workspaceId: req.workspaceId, esCurrent: true, moneda: 'USD' } }),
+      prisma.tasaBCV.findFirst({ where: { workspaceId: req.workspaceId, esCurrent: true, moneda: 'EUR' } })
+    ])
+    const usdToEur = (tasaUSD?.tasa && tasaEUR?.tasa) ? tasaUSD.tasa / tasaEUR.tasa : 1
+    const costoIngredientesEnEur = data.costoIngredientesUsd * usdToEur
+    const costoTotal = costoIngredientesEnEur + data.costoGasEur + data.costoEmpaqueEur
     const margenGanancia = data.precioVentaEur > 0
       ? ((data.precioVentaEur - costoTotal) / data.precioVentaEur) * 100
       : 0
@@ -85,7 +93,7 @@ router.post('/', requireWorkspace('EDITOR'), async (req, res) => {
         imagenUrl: data.imagenUrl,
         porciones: data.porciones,
         tiempoPrep: data.tiempoPrep,
-        costoIngredientesEur: data.costoIngredientesEur,
+        costoIngredientesUsd: data.costoIngredientesUsd,
         costoGasEur: data.costoGasEur,
         costoEmpaqueEur: data.costoEmpaqueEur,
         costoTotalEur: costoTotal,
@@ -118,7 +126,16 @@ router.put('/:id', requireWorkspace('EDITOR'), async (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Receta no encontrada' })
 
     const { ingredientes, variantes, workspaceId: _, ...rest } = req.body
-    const costoTotal = (rest.costoIngredientesEur ?? existing.costoIngredientesEur)
+
+    // Obtener tasas para recalcular conversión USD → EUR
+    const [tasaUSD, tasaEUR] = await Promise.all([
+      prisma.tasaBCV.findFirst({ where: { workspaceId: req.workspaceId, esCurrent: true, moneda: 'USD' } }),
+      prisma.tasaBCV.findFirst({ where: { workspaceId: req.workspaceId, esCurrent: true, moneda: 'EUR' } })
+    ])
+    const usdToEur = (tasaUSD?.tasa && tasaEUR?.tasa) ? tasaUSD.tasa / tasaEUR.tasa : 1
+    const costoUsd = rest.costoIngredientesUsd ?? existing.costoIngredientesUsd
+    const costoIngredientesEnEur = costoUsd * usdToEur
+    const costoTotal = costoIngredientesEnEur
       + (rest.costoGasEur ?? existing.costoGasEur)
       + (rest.costoEmpaqueEur ?? existing.costoEmpaqueEur)
 

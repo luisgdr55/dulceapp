@@ -19,7 +19,8 @@ router.get('/', requireWorkspace('VIEWER'), async (req, res) => {
     pedidosPendientes,
     pedidosEnProceso,
     notificacionesSinLeer,
-    tasaActual,
+    tasaEUR,
+    tasaUSD,
     ventasSemanaPasada,
     proximasEntregas,
     recetasTop
@@ -37,7 +38,8 @@ router.get('/', requireWorkspace('VIEWER'), async (req, res) => {
     prisma.pedido.count({ where: { workspaceId: wid, estado: 'PENDIENTE' } }),
     prisma.pedido.count({ where: { workspaceId: wid, estado: 'EN_PROCESO' } }),
     prisma.notificacion.count({ where: { workspaceId: wid, leida: false } }),
-    prisma.tasaBCV.findFirst({ where: { workspaceId: wid, esCurrent: true } }),
+    prisma.tasaBCV.findFirst({ where: { workspaceId: wid, esCurrent: true, moneda: 'EUR' } }),
+    prisma.tasaBCV.findFirst({ where: { workspaceId: wid, esCurrent: true, moneda: 'USD' } }),
     prisma.pedido.aggregate({
       where: {
         workspaceId: wid, estado: 'ENTREGADO',
@@ -99,7 +101,9 @@ router.get('/', requireWorkspace('VIEWER'), async (req, res) => {
 
   res.json({
     periodo,
-    tasaBCV: tasaActual?.tasa || 0,
+    tasaBCV: tasaEUR?.tasa || 0,
+    tasaEUR: tasaEUR?.tasa || 0,
+    tasaUSD: tasaUSD?.tasa || 0,
     hoy: {
       ventas: ventasHoy._count,
       ingresosEur: ventasHoy._sum.totalEur || 0,

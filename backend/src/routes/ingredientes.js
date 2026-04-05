@@ -48,7 +48,7 @@ router.post('/', requireWorkspace('EDITOR'), async (req, res) => {
       unidad:         z.string().min(1),
       cantidadActual: z.number().min(0).default(0),
       cantidadMinima: z.number().min(0).default(0),
-      precioEur:      z.number().min(0),
+      precioUsd:      z.number().min(0),
       proveedor:      z.string().optional(),
       notas:          z.string().optional(),
       esAccesorio:    z.boolean().default(false)

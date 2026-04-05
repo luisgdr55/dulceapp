@@ -77,10 +77,10 @@ const TOOLS = [
           unidad:         { type: 'string' },
           cantidadActual: { type: 'number' },
           cantidadMinima: { type: 'number' },
-          precioEur:      { type: 'number' },
+          precioUsd:      { type: 'number', description: 'Precio de compra en USD' },
           proveedor:      { type: 'string' }
         },
-        required: ['nombre', 'unidad', 'precioEur']
+        required: ['nombre', 'unidad', 'precioUsd']
       }
     }
   },
@@ -88,13 +88,14 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'actualizar_tasa_bcv',
-      description: 'Actualiza la tasa de cambio EUR/Bs',
+      description: 'Actualiza la tasa de cambio BCV (EUR→Bs o USD→Bs)',
       parameters: {
         type: 'object',
         properties: {
-          tasa: { type: 'number', description: 'Tasa BCV EUR → Bs' }
+          tasa:   { type: 'number', description: 'Nuevo valor de la tasa (Bs por unidad)' },
+          moneda: { type: 'string', enum: ['EUR', 'USD'], description: 'Moneda de la tasa: EUR (euros) o USD (dólares)' }
         },
-        required: ['tasa']
+        required: ['tasa', 'moneda']
       }
     }
   },

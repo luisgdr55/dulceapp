@@ -85,29 +85,28 @@ router.delete('/:workspaceId/miembros/:userId', requireWorkspace('OWNER'), async
 
 // GET /api/workspaces/:workspaceId/tasa-bcv
 router.get('/:workspaceId/tasa-bcv', requireWorkspace('VIEWER'), async (req, res) => {
-  const [actual, historial] = await Promise.all([
-    prisma.tasaBCV.findFirst({ where: { workspaceId: req.workspaceId, esCurrent: true } }),
-    prisma.tasaBCV.findMany({
-      where: { workspaceId: req.workspaceId },
-      orderBy: { fecha: 'desc' },
-      take: 30
-    })
+  const [actualEUR, actualUSD, historialEUR, historialUSD] = await Promise.all([
+    prisma.tasaBCV.findFirst({ where: { workspaceId: req.workspaceId, esCurrent: true, moneda: 'EUR' } }),
+    prisma.tasaBCV.findFirst({ where: { workspaceId: req.workspaceId, esCurrent: true, moneda: 'USD' } }),
+    prisma.tasaBCV.findMany({ where: { workspaceId: req.workspaceId, moneda: 'EUR' }, orderBy: { fecha: 'desc' }, take: 30 }),
+    prisma.tasaBCV.findMany({ where: { workspaceId: req.workspaceId, moneda: 'USD' }, orderBy: { fecha: 'desc' }, take: 30 })
   ])
-  res.json({ actual, historial })
+  res.json({ actualEUR, actualUSD, historialEUR, historialUSD })
 })
 
 // POST /api/workspaces/:workspaceId/tasa-bcv
 router.post('/:workspaceId/tasa-bcv', requireWorkspace('EDITOR'), async (req, res) => {
   const tasa = parseFloat(req.body.tasa)
+  const moneda = req.body.moneda === 'USD' ? 'USD' : 'EUR'
   if (!tasa || isNaN(tasa) || tasa <= 0) {
     return res.status(400).json({ error: 'Tasa inválida. Debe ser un número positivo.' })
   }
   await prisma.tasaBCV.updateMany({
-    where: { workspaceId: req.workspaceId, esCurrent: true },
+    where: { workspaceId: req.workspaceId, esCurrent: true, moneda },
     data: { esCurrent: false }
   })
   const nueva = await prisma.tasaBCV.create({
-    data: { workspaceId: req.workspaceId, tasa, esCurrent: true, fuente: 'manual' }
+    data: { workspaceId: req.workspaceId, moneda, tasa, esCurrent: true, fuente: 'manual' }
   })
   res.status(201).json(nueva)
 })

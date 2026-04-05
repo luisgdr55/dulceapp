@@ -55,7 +55,12 @@ router.post('/register', async (req, res) => {
                   }
                 },
                 tasasBCV: {
-                  create: { tasa: 46.5, esCurrent: true, fuente: 'manual' }
+                  createMany: {
+                    data: [
+                      { moneda: 'EUR', tasa: 46.5, esCurrent: true, fuente: 'manual' },
+                      { moneda: 'USD', tasa: 36.5, esCurrent: true, fuente: 'manual' }
+                    ]
+                  }
                 }
               }
             }

@@ -43,7 +43,7 @@ async function crearPedido(params, { workspaceId, userId, canal }) {
   const data = schema.parse(params)
 
   const [tasaActual, receta] = await Promise.all([
-    prisma.tasaBCV.findFirst({ where: { workspaceId, esCurrent: true } }),
+    prisma.tasaBCV.findFirst({ where: { workspaceId, esCurrent: true, moneda: 'EUR' } }),
     prisma.receta.findUnique({ where: { id: data.recetaId }, include: { variantes: true } })
   ])
 
@@ -125,7 +125,7 @@ async function agregarIngrediente(params, { workspaceId, userId, canal }) {
     unidad:         z.string(),
     cantidadActual: z.number().min(0).default(0),
     cantidadMinima: z.number().min(0).default(0),
-    precioEur:      z.number().min(0),
+    precioUsd:      z.number().min(0),
     proveedor:      z.string().optional()
   })
   const data = schema.parse(params)
@@ -144,22 +144,25 @@ async function agregarIngrediente(params, { workspaceId, userId, canal }) {
 }
 
 async function actualizarTasaBCV(params, { workspaceId, userId, canal }) {
-  const { tasa } = z.object({ tasa: z.number().positive() }).parse(params)
+  const { tasa, moneda = 'EUR' } = z.object({
+    tasa:   z.number().positive(),
+    moneda: z.enum(['EUR', 'USD']).default('EUR')
+  }).parse(params)
 
   await prisma.$transaction([
-    prisma.tasaBCV.updateMany({ where: { workspaceId, esCurrent: true }, data: { esCurrent: false } }),
-    prisma.tasaBCV.create({ data: { workspaceId, tasa, esCurrent: true, fuente: canal === 'cron' ? 'auto-cron' : 'manual' } })
+    prisma.tasaBCV.updateMany({ where: { workspaceId, esCurrent: true, moneda }, data: { esCurrent: false } }),
+    prisma.tasaBCV.create({ data: { workspaceId, moneda, tasa, esCurrent: true, fuente: canal === 'cron' ? 'auto-cron' : 'manual' } })
   ])
 
   await prisma.auditLog.create({
     data: {
       workspaceId, userId, canal,
       accion: 'actualizar_tasa_bcv', entidad: 'TasaBCV',
-      payload: auditPayload({ tasa })
+      payload: auditPayload({ tasa, moneda })
     }
   })
 
-  return { ok: true, tasa }
+  return { ok: true, tasa, moneda }
 }
 
 // ─── Herramientas de análisis (lectura) ──────────────────────────────────────

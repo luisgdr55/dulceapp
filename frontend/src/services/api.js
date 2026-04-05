@@ -83,7 +83,7 @@ export const workspacesApi = {
   getConfig:      (wid)          => req(`${BASE}/workspaces/${wid}/config?workspaceId=${wid}`),
   putConfig:      (wid, data)    => req(`${BASE}/workspaces/${wid}/config?workspaceId=${wid}`, { method: 'PUT', body: JSON.stringify(data) }),
   getTasaBCV:     (wid)          => req(`${BASE}/workspaces/${wid}/tasa-bcv?workspaceId=${wid}`),
-  postTasaBCV:    (wid, tasa)    => req(`${BASE}/workspaces/${wid}/tasa-bcv?workspaceId=${wid}`, { method: 'POST', body: JSON.stringify({ tasa }) }),
+  postTasaBCV:    (wid, tasa, moneda = 'EUR') => req(`${BASE}/workspaces/${wid}/tasa-bcv?workspaceId=${wid}`, { method: 'POST', body: JSON.stringify({ tasa, moneda }) }),
   getMiembros:    (wid)          => req(`${BASE}/workspaces/${wid}/miembros?workspaceId=${wid}`),
   postMiembro:    (wid, data)    => req(`${BASE}/workspaces/${wid}/miembros?workspaceId=${wid}`, { method: 'POST', body: JSON.stringify(data) }),
   deleteMiembro:  (wid, userId)  => req(`${BASE}/workspaces/${wid}/miembros/${userId}?workspaceId=${wid}`, { method: 'DELETE' })

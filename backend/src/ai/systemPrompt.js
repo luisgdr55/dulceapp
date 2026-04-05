@@ -4,9 +4,10 @@
 import { prisma } from '../utils/prisma.js'
 
 export async function buildSystemPrompt(workspaceId) {
-  const [config, tasaActual, recetas, ingredientesAll, pedidosPendientes] = await Promise.all([
+  const [config, tasaEUR, tasaUSD, recetas, ingredientesAll, pedidosPendientes] = await Promise.all([
     prisma.businessConfig.findUnique({ where: { workspaceId } }),
-    prisma.tasaBCV.findFirst({ where: { workspaceId, esCurrent: true }, orderBy: { fecha: 'desc' } }),
+    prisma.tasaBCV.findFirst({ where: { workspaceId, esCurrent: true, moneda: 'EUR' }, orderBy: { fecha: 'desc' } }),
+    prisma.tasaBCV.findFirst({ where: { workspaceId, esCurrent: true, moneda: 'USD' }, orderBy: { fecha: 'desc' } }),
     prisma.receta.findMany({
       where: { workspaceId, activa: true },
       select: {
@@ -38,7 +39,8 @@ export async function buildSystemPrompt(workspaceId) {
 
   const nombreNegocio = config?.negocio || 'el negocio'
   const nombreDuena = config ? `${config.nombre} ${config.apellido || ''}`.trim() : 'la repostera'
-  const tasa = tasaActual?.tasa || 0
+  const tasaEurVal = tasaEUR?.tasa || 0
+  const tasaUsdVal = tasaUSD?.tasa || 0
   const hoy = new Date().toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long' })
 
   return `Eres Dulce, asistente inteligente de ${nombreNegocio}, la repostería de ${nombreDuena}. Hoy es ${hoy}.
@@ -50,9 +52,11 @@ PERSONALIDAD:
 - Si falta información para ejecutar una acción, pídela de forma conversacional
 
 CONTEXTO DEL NEGOCIO:
-Tasa BCV actual: ${tasa > 0 ? `${tasa} Bs/EUR` : 'no configurada'}
+Tasa BCV EUR→Bs: ${tasaEurVal > 0 ? `${tasaEurVal} Bs/EUR` : 'no configurada'}
+Tasa BCV USD→Bs: ${tasaUsdVal > 0 ? `${tasaUsdVal} Bs/USD` : 'no configurada'}
+Tipo de cambio USD→EUR: ${(tasaEurVal > 0 && tasaUsdVal > 0) ? (tasaUsdVal / tasaEurVal).toFixed(4) : 'no calculable'}
 Ciudad: ${config?.ciudad || 'no especificada'}
-Moneda principal: ${config?.monedaPrincipal || 'EUR'}
+Moneda principal de ventas: EUR | Moneda de compra ingredientes: USD
 
 RECETARIO (${recetas.length} recetas activas):
 ${recetas.map(r => {
@@ -76,7 +80,9 @@ ${pedidosPendientes.length > 0
   : 'Sin pedidos pendientes'}
 
 REGLAS DE NEGOCIO:
-- Siempre calcula los totales en Bs usando la tasa BCV actual
+- Ingredientes se compran en USD — usa precioUsd al agregar ingredientes
+- Ventas y pedidos van en EUR — usa tasaEUR para convertir a Bs
+- Para calcular costos de receta: costo_ingredientes_USD × (tasaUSD/tasaEUR) = costo en EUR
 - El número de pedido se genera automáticamente (no lo pidas al usuario)
 - Si el usuario dice "anotar", "registrar", "crear" → crear_pedido o venta_rapida
 - Si dice "vendí" sin mencionar cliente → venta_rapida

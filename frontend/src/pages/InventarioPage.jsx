@@ -6,7 +6,7 @@ import { pg, Field } from './_styles.jsx'
 
 const EMPTY_FORM = {
   nombre: '', categoria: '', unidad: 'g', cantidadActual: 0,
-  cantidadMinima: 0, precioEur: 0, proveedor: '', notas: '', esAccesorio: false
+  cantidadMinima: 0, precioUsd: 0, proveedor: '', notas: '', esAccesorio: false
 }
 
 const s = {
@@ -70,7 +70,7 @@ export function InventarioPage() {
     setForm({
       nombre: ing.nombre || '', categoria: ing.categoria || '', unidad: ing.unidad || 'g',
       cantidadActual: ing.cantidadActual || 0, cantidadMinima: ing.cantidadMinima || 0,
-      precioEur: ing.precioEur || 0, proveedor: ing.proveedor || '',
+      precioUsd: ing.precioUsd || 0, proveedor: ing.proveedor || '',
       notas: ing.notas || '', esAccesorio: ing.esAccesorio || false
     })
     setEditingId(ing.id)
@@ -87,7 +87,7 @@ export function InventarioPage() {
         ...form,
         cantidadActual: parseFloat(form.cantidadActual) || 0,
         cantidadMinima: parseFloat(form.cantidadMinima) || 0,
-        precioEur: parseFloat(form.precioEur) || 0
+        precioUsd: parseFloat(form.precioUsd) || 0
       }
       if (editingId) {
         await ingredientesApi.update(activeWorkspaceId, editingId, payload)
@@ -154,7 +154,7 @@ export function InventarioPage() {
             <Field label="Cantidad mínima" type="number" value={form.cantidadMinima} onChange={set('cantidadMinima')} />
           </div>
           <div style={s.row2}>
-            <Field label="Precio EUR" type="number" value={form.precioEur} onChange={set('precioEur')} />
+            <Field label="Precio USD ($)" type="number" value={form.precioUsd} onChange={set('precioUsd')} />
             <Field label="Proveedor" value={form.proveedor} onChange={set('proveedor')} />
           </div>
           <Field label="Notas" value={form.notas} onChange={set('notas')} multiline />
@@ -179,7 +179,7 @@ export function InventarioPage() {
           <table style={pg.table}>
             <thead>
               <tr>
-                {['Ingrediente', 'Categoría', 'Stock actual', 'Mínimo', 'Precio/u', 'Estado', 'Ajuste rápido'].map(h => (
+                {['Ingrediente', 'Categoría', 'Stock actual', 'Mínimo', 'Precio/u (USD)', 'Estado', 'Ajuste rápido'].map(h => (
                   <th key={h} style={pg.th}>{h}</th>
                 ))}
               </tr>
@@ -199,7 +199,7 @@ export function InventarioPage() {
                       {i.cantidadActual}{i.unidad}
                     </td>
                     <td style={pg.td}>{i.cantidadMinima}{i.unidad}</td>
-                    <td style={pg.td}>€{i.precioEur?.toFixed(3)}</td>
+                    <td style={pg.td}>${i.precioUsd?.toFixed(3)}</td>
                     <td style={pg.td}>
                       {bajo ? <span style={pg.tagDanger}>Bajo stock</span> : <span style={pg.tagOk}>OK</span>}
                     </td>

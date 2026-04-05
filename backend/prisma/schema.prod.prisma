@@ -87,6 +87,7 @@ model BusinessConfig {
 model TasaBCV {
   id          String    @id @default(cuid())
   workspaceId String
+  moneda      String    @default("EUR")
   tasa        Float
   fecha       DateTime  @default(now())
   esCurrent   Boolean   @default(false)
@@ -95,7 +96,7 @@ model TasaBCV {
 
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
-  @@index([workspaceId, esCurrent])
+  @@index([workspaceId, moneda, esCurrent])
 }
 
 model BackupConfig {
@@ -124,7 +125,7 @@ model Ingrediente {
   unidad          String
   cantidadActual  Float     @default(0)
   cantidadMinima  Float     @default(0)
-  precioEur       Float     @default(0)
+  precioUsd       Float     @default(0)
   proveedor       String?
   notas           String?
   esAccesorio     Boolean   @default(false)
@@ -146,7 +147,7 @@ model Receta {
   imagenUrl            String?
   porciones            Int       @default(1)
   tiempoPrep           Int?
-  costoIngredientesEur Float     @default(0)
+  costoIngredientesUsd Float     @default(0)
   costoGasEur          Float     @default(0)
   costoEmpaqueEur      Float     @default(0)
   costoTotalEur        Float     @default(0)
