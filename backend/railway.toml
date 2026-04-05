@@ -1,11 +1,9 @@
 [build]
 builder = "dockerfile"
 dockerfilePath = "Dockerfile"
-buildCommand = "docker build --no-cache ."
 
 [deploy]
-startCommand = "npx prisma db push --accept-data-loss && node src/index.js"
 healthcheckPath = "/health"
-healthcheckTimeout = 60
+healthcheckTimeout = 120
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
