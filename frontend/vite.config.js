@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   define: {
-    'import.meta.env.VITE_API_URL': JSON.stringify('https://dulceapp-production.up.railway.app/api')
+    'import.meta.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL || 'https://dulceapp-production.up.railway.app/api')
   },
   plugins: [
     react(),
