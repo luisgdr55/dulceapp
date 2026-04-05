@@ -72,6 +72,31 @@ function PerfilSection({ wid }) {
   )
 }
 
+// ── Fila de tasa individual — definida FUERA del componente padre para evitar
+//    pérdida de foco al re-renderizar (si estuviera dentro, React la recrearía
+//    como tipo nuevo en cada keystroke y desmontaría el input)
+function TasaRow({ label, actual, valor, setValor, onSave, placeholder }) {
+  return (
+    <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 12 }}>
+      <p style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>{label}</p>
+      {actual && (
+        <div style={{ fontSize: 14, color: '#374151', marginBottom: 8 }}>
+          Tasa actual: <strong style={{ color: '#7B61C4', fontSize: 18 }}>{actual.tasa.toFixed(2)} Bs</strong>
+          <span style={{ marginLeft: 10, fontSize: 12, color: '#9ca3af' }}>
+            {new Date(actual.fecha).toLocaleDateString('es-VE')}
+          </span>
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+        <div style={{ flex: 1 }}>
+          <Field label="Nueva tasa" type="number" value={valor} onChange={e => setValor(e.target.value)} placeholder={placeholder} />
+        </div>
+        <button style={{ ...pg.btnPrimary, height: 42 }} onClick={onSave} disabled={!valor}>Actualizar</button>
+      </div>
+    </div>
+  )
+}
+
 // ── Tasa BCV ──────────────────────────────────────────────────────────────────
 function TasaBCVSection({ wid }) {
   const [tasas, setTasas] = useState({ actualEUR: null, actualUSD: null, historialEUR: [], historialUSD: [] })
@@ -101,26 +126,6 @@ function TasaBCVSection({ wid }) {
     setTimeout(() => setMsg(null), 3000)
   }
 
-  const TasaRow = ({ label, actual, valor, setValor, moneda, placeholder }) => (
-    <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 12 }}>
-      <p style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 8 }}>{label}</p>
-      {actual && (
-        <div style={{ fontSize: 14, color: '#374151', marginBottom: 8 }}>
-          Tasa actual: <strong style={{ color: '#7B61C4', fontSize: 18 }}>{actual.tasa.toFixed(2)} Bs</strong>
-          <span style={{ marginLeft: 10, fontSize: 12, color: '#9ca3af' }}>
-            {new Date(actual.fecha).toLocaleDateString('es-VE')}
-          </span>
-        </div>
-      )}
-      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
-        <div style={{ flex: 1 }}>
-          <Field label="Nueva tasa" type="number" value={valor} onChange={e => setValor(e.target.value)} placeholder={placeholder} />
-        </div>
-        <button style={{ ...pg.btnPrimary, height: 42 }} onClick={() => save(moneda, valor)} disabled={!valor}>Actualizar</button>
-      </div>
-    </div>
-  )
-
   return (
     <div style={s.section}>
       <p style={s.sectionTitle}>Tasas BCV</p>
@@ -128,13 +133,15 @@ function TasaBCVSection({ wid }) {
         label="EUR → Bs (ventas y pedidos)"
         actual={tasas.actualEUR}
         valor={tasaEur} setValor={setTasaEur}
-        moneda="EUR" placeholder="Ej: 46.50"
+        onSave={() => save('EUR', tasaEur)}
+        placeholder="Ej: 46.50"
       />
       <TasaRow
         label="USD → Bs (compra de ingredientes)"
         actual={tasas.actualUSD}
         valor={tasaUsd} setValor={setTasaUsd}
-        moneda="USD" placeholder="Ej: 36.50"
+        onSave={() => save('USD', tasaUsd)}
+        placeholder="Ej: 36.50"
       />
       {msg && <p style={msg.ok ? s.msgOk : s.msgErr}>{msg.text}</p>}
       {(tasas.historialEUR.length > 0 || tasas.historialUSD.length > 0) && (
