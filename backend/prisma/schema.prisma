@@ -1,14 +1,13 @@
 // DULCEAPP — Schema Prisma multi-tenant
-// VERSION: SQLite (desarrollo local)
-// Para producción con PostgreSQL: cambiar provider a "postgresql"
-//   y los campos String marcados con "// JSON en postgres" volver a Json
+// VERSION: PostgreSQL (producción — Railway)
+// Para desarrollo con SQLite: usar schema.dev.prisma y script db:use-dev
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -258,7 +257,6 @@ model Notificacion {
   @@index([workspaceId, leida])
 }
 
-// Auditoría: quién hizo qué y cuándo
 model AuditLog {
   id          String    @id @default(cuid())
   workspaceId String
@@ -267,7 +265,7 @@ model AuditLog {
   accion      String
   entidad     String
   entidadId   String?
-  payload     String?   // JSON serializado (Json en postgres)
+  payload     Json?
   createdAt   DateTime  @default(now())
 
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -286,7 +284,7 @@ model AIConversation {
   workspaceId String
   userId      String?
   canal       String    @default("web")
-  messages    String    @default("[]")  // JSON serializado (Json en postgres)
+  messages    Json      @default("[]")
   activa      Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -300,8 +298,8 @@ model AIAction {
   id             String   @id @default(cuid())
   conversationId String
   tool           String
-  params         String   // JSON serializado (Json en postgres)
-  resultado      String?  // JSON serializado (Json en postgres)
+  params         Json
+  resultado      Json?
   confirmada     Boolean  @default(false)
   ejecutada      Boolean  @default(false)
   createdAt      DateTime @default(now())
