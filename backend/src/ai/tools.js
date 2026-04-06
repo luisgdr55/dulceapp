@@ -12,15 +12,16 @@ const auditPayload = (obj) =>
 export async function executeAITool({ toolName, params, workspaceId, userId, canal }) {
   const context = { workspaceId, userId, canal }
   const handlers = {
-    crear_pedido:          () => crearPedido(params, context),
-    venta_rapida:          () => ventaRapida(params, context),
-    actualizar_stock:      () => actualizarStock(params, context),
-    agregar_ingrediente:   () => agregarIngrediente(params, context),
-    actualizar_tasa_bcv:   () => actualizarTasaBCV(params, context),
-    analizar_rentabilidad: () => analizarRentabilidad(params, context),
-    proyectar_demanda:     () => proyectarDemanda(params, context),
-    resumen_negocio:       () => resumenNegocio(params, context),
-    alertas_stock:         () => alertasStock(params, context),
+    crear_pedido:                () => crearPedido(params, context),
+    venta_rapida:                () => ventaRapida(params, context),
+    actualizar_stock:            () => actualizarStock(params, context),
+    agregar_ingrediente:         () => agregarIngrediente(params, context),
+    actualizar_tasa_bcv:         () => actualizarTasaBCV(params, context),
+    actualizar_precio_ingrediente: () => actualizarPrecioIngrediente(params, context),
+    analizar_rentabilidad:       () => analizarRentabilidad(params, context),
+    proyectar_demanda:           () => proyectarDemanda(params, context),
+    resumen_negocio:             () => resumenNegocio(params, context),
+    alertas_stock:               () => alertasStock(params, context),
   }
   const handler = handlers[toolName]
   if (!handler) throw new Error(`Tool desconocida: ${toolName}`)
@@ -253,6 +254,100 @@ async function resumenNegocio({ periodo = '7d' }, { workspaceId }) {
     pedidosPendientes,
     ingredientesBajoStock
   }
+}
+
+async function actualizarPrecioIngrediente({ actualizaciones }, { workspaceId, userId, canal }) {
+  const schema = z.object({
+    actualizaciones: z.array(z.object({
+      ingredienteId:       z.string(),
+      nuevoPrecioUsd:      z.number().positive(),
+      nuevaCantidadPorCompra: z.number().positive().optional()
+    })).min(1)
+  })
+  const { actualizaciones: lista } = schema.parse({ actualizaciones })
+
+  // Obtener tasas actuales para recalcular costos
+  const [tasaUSD, tasaEUR] = await Promise.all([
+    prisma.tasaBCV.findFirst({ where: { workspaceId, esCurrent: true, moneda: 'USD' }, orderBy: { fecha: 'desc' } }),
+    prisma.tasaBCV.findFirst({ where: { workspaceId, esCurrent: true, moneda: 'EUR' }, orderBy: { fecha: 'desc' } })
+  ])
+  const usdToEur = (tasaUSD?.tasa && tasaEUR?.tasa) ? tasaUSD.tasa / tasaEUR.tasa : 1
+
+  const resultados = []
+
+  for (const { ingredienteId, nuevoPrecioUsd, nuevaCantidadPorCompra } of lista) {
+    const updateData = { precioUsd: nuevoPrecioUsd }
+    if (nuevaCantidadPorCompra) updateData.cantidadPorCompra = nuevaCantidadPorCompra
+
+    const ingrediente = await prisma.ingrediente.update({
+      where: { id: ingredienteId, workspaceId },
+      data: updateData
+    })
+
+    // Recalcular costos de recetas que usan este ingrediente
+    const recetasAfectadas = await prisma.recetaIngrediente.findMany({
+      where: { ingredienteId },
+      include: { receta: { include: { ingredientes: { include: { ingrediente: true } } } } }
+    })
+
+    // Deduplicar recetas (una receta puede aparecer si tiene múltiples ingredientes actualizados)
+    const recetasVistas = new Set()
+    for (const ri of recetasAfectadas) {
+      if (recetasVistas.has(ri.receta.id)) continue
+      recetasVistas.add(ri.receta.id)
+
+      // Recalcular costoIngredientesUsd sumando con los precios actualizados
+      let costoIngUsd = 0
+      for (const item of ri.receta.ingredientes) {
+        const costoUnit = item.ingrediente.precioUsd / (item.ingrediente.cantidadPorCompra || 1)
+        costoIngUsd += costoUnit * item.cantidad
+      }
+
+      const costoIngEur = costoIngUsd * usdToEur
+      const nuevoCostoTotal = costoIngEur + ri.receta.costoGasEur + ri.receta.costoEmpaqueEur
+      const nuevoMargen = ri.receta.precioVentaEur > 0
+        ? ((ri.receta.precioVentaEur - nuevoCostoTotal) / ri.receta.precioVentaEur) * 100
+        : 0
+
+      await prisma.receta.update({
+        where: { id: ri.receta.id },
+        data: {
+          costoIngredientesUsd: costoIngUsd,
+          costoTotalEur: nuevoCostoTotal,
+          margenGanancia: nuevoMargen
+        }
+      })
+
+      // Alerta si margen quedó bajo
+      if (nuevoMargen < 15) {
+        await prisma.notificacion.create({
+          data: {
+            workspaceId,
+            tipo: 'margen_bajo',
+            titulo: `Margen bajo: ${ri.receta.nombre}`,
+            mensaje: `Después de actualizar precios, el margen de "${ri.receta.nombre}" bajó a ${nuevoMargen.toFixed(1)}%. Considera actualizar el precio de venta.`,
+            referenciaId: ri.receta.id
+          }
+        })
+      }
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        workspaceId, userId, canal,
+        accion: 'actualizar_precio_ingrediente', entidad: 'Ingrediente', entidadId: ingrediente.id,
+        payload: auditPayload({ nuevoPrecioUsd, nuevaCantidadPorCompra, recetasAfectadas: recetasVistas.size })
+      }
+    })
+
+    resultados.push({
+      ingrediente: ingrediente.nombre,
+      nuevoPrecioUsd,
+      recetasRecalculadas: recetasVistas.size
+    })
+  }
+
+  return { ok: true, actualizaciones: resultados }
 }
 
 async function alertasStock(_, { workspaceId }) {

@@ -46,6 +46,7 @@ export const ingredientesApi = {
   get:    (wid, id)          => req(`${BASE}/ingredientes/${id}?workspaceId=${wid}`),
   create: (wid, data)        => req(`${BASE}/ingredientes`, { method: 'POST', body: JSON.stringify({ workspaceId: wid, ...data }) }),
   update: (wid, id, data)    => req(`${BASE}/ingredientes/${id}?workspaceId=${wid}`, { method: 'PUT', body: JSON.stringify(data) }),
+  patch:  (wid, id, data)    => req(`${BASE}/ingredientes/${id}?workspaceId=${wid}`, { method: 'PATCH', body: JSON.stringify(data) }),
   stock:  (wid, id, cantidad, operacion = 'set') =>
     req(`${BASE}/ingredientes/${id}/stock?workspaceId=${wid}`, { method: 'PATCH', body: JSON.stringify({ cantidad, operacion }) }),
   delete: (wid, id)          => req(`${BASE}/ingredientes/${id}?workspaceId=${wid}`, { method: 'DELETE' })

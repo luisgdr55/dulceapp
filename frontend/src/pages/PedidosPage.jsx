@@ -91,7 +91,12 @@ function NuevoPedidoModal({ wid, recetas, onClose, onCreado }) {
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState(null)
 
-  const set = k => e => setForm(p => ({ ...p, [k]: e.target.value }))
+  const set = k => e => {
+    const val = e.target.value
+    // Al cambiar receta, limpiar variante seleccionada
+    if (k === 'recetaId') return setForm(p => ({ ...p, recetaId: val, varianteId: '' }))
+    setForm(p => ({ ...p, [k]: val }))
+  }
 
   const recetaSel = recetas.find(r => r.id === form.recetaId)
   const varianteSel = recetaSel?.variantes?.find(v => v.id === form.varianteId)

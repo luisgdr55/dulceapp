@@ -29,13 +29,13 @@ const s = {
 
 // ── Perfil del negocio ────────────────────────────────────────────────────────
 function PerfilSection({ wid }) {
-  const [form, setForm] = useState({ nombre: '', apellido: '', negocio: '', ciudad: '', email: '', telefono: '', monedaPrincipal: 'EUR' })
+  const [form, setForm] = useState({ nombre: '', apellido: '', negocio: '', ciudad: '', email: '', telefono: '', monedaPrincipal: 'EUR', tarifaHoraEur: 5.0 })
   const [msg, setMsg] = useState(null)
   const set = k => e => setForm(p => ({ ...p, [k]: e.target.value }))
 
   useEffect(() => {
     if (!wid) return
-    workspacesApi.getConfig(wid).then(c => { if (c) setForm({ nombre: c.nombre || '', apellido: c.apellido || '', negocio: c.negocio || '', ciudad: c.ciudad || '', email: c.email || '', telefono: c.telefono || '', monedaPrincipal: c.monedaPrincipal || 'EUR' }) }).catch(() => {})
+    workspacesApi.getConfig(wid).then(c => { if (c) setForm({ nombre: c.nombre || '', apellido: c.apellido || '', negocio: c.negocio || '', ciudad: c.ciudad || '', email: c.email || '', telefono: c.telefono || '', monedaPrincipal: c.monedaPrincipal || 'EUR', tarifaHoraEur: c.tarifaHoraEur ?? 5.0 }) }).catch(() => {})
   }, [wid])
 
   const save = async () => {
@@ -65,6 +65,23 @@ function PerfilSection({ wid }) {
           <option value="EUR">EUR — Euro</option>
           <option value="USD">USD — Dólar</option>
         </select>
+      </div>
+      <div style={{ borderTop: '1px solid rgba(0,0,0,0.06)', paddingTop: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <Field
+          label="Tarifa por hora de trabajo (€)"
+          type="number"
+          value={form.tarifaHoraEur}
+          onChange={set('tarifaHoraEur')}
+          placeholder="Ej: 8.00"
+        />
+        <p style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.5 }}>
+          ¿Cuánto vale tu hora de trabajo? Esto se usa para calcular el costo de mano de obra en tus recetas.
+          {form.tarifaHoraEur > 0 && (
+            <span style={{ color: '#7B61C4', fontWeight: 500 }}>
+              {' '}(€{Number(form.tarifaHoraEur).toFixed(2)}/h → €{(Number(form.tarifaHoraEur) / 60).toFixed(4)}/min)
+            </span>
+          )}
+        </p>
       </div>
       {msg && <p style={msg.ok ? s.msgOk : s.msgErr}>{msg.text}</p>}
       <button style={pg.btnPrimary} onClick={save}>Guardar perfil</button>

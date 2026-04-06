@@ -78,6 +78,7 @@ model BusinessConfig {
   email             String?
   telefono          String?
   monedaPrincipal   String    @default("EUR")
+  tarifaHoraEur     Float     @default(5.0)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
@@ -125,7 +126,8 @@ model Ingrediente {
   unidad          String
   cantidadActual  Float     @default(0)
   cantidadMinima  Float     @default(0)
-  precioUsd       Float     @default(0)
+  precioUsd            Float     @default(0)
+  cantidadPorCompra    Float     @default(1)
   proveedor       String?
   notas           String?
   esAccesorio     Boolean   @default(false)
@@ -147,7 +149,9 @@ model Receta {
   imagenUrl            String?
   porciones            Int       @default(1)
   tiempoPrep           Int?
+  tiempoElaboracion    Int?
   costoIngredientesUsd Float     @default(0)
+  costoManoDeObraEur   Float     @default(0)
   costoGasEur          Float     @default(0)
   costoEmpaqueEur      Float     @default(0)
   costoTotalEur        Float     @default(0)

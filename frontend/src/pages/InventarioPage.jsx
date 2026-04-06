@@ -1,12 +1,12 @@
 // src/pages/InventarioPage.jsx
 import { useEffect, useState, useCallback } from 'react'
 import { useAppStore } from '../stores/appStore.js'
-import { ingredientesApi } from '../services/api.js'
+import { ingredientesApi, recetasApi } from '../services/api.js'
 import { pg, Field } from './_styles.jsx'
 
 const EMPTY_FORM = {
   nombre: '', categoria: '', unidad: 'g', cantidadActual: 0,
-  cantidadMinima: 0, precioUsd: 0, proveedor: '', notas: '', esAccesorio: false
+  cantidadMinima: 0, precioUsd: 0, cantidadPorCompra: 1, proveedor: '', notas: '', esAccesorio: false
 }
 
 const s = {
@@ -42,6 +42,12 @@ export function InventarioPage() {
   // Stock editado por fila (id → valor temporal)
   const [stockEdits, setStockEdits] = useState({})
 
+  // Precio inline: id → { editing: bool, value: string }
+  const [precioEdits, setPrecioEdits] = useState({})
+  // ids de ingredientes cuyo precio fue actualizado (para mostrar botón recalcular)
+  const [actualizados, setActualizados] = useState(new Set())
+  const [recalcMsg, setRecalcMsg] = useState(null)
+
   const load = useCallback(() => {
     if (!activeWorkspaceId) return
     setLoading(true)
@@ -70,8 +76,8 @@ export function InventarioPage() {
     setForm({
       nombre: ing.nombre || '', categoria: ing.categoria || '', unidad: ing.unidad || 'g',
       cantidadActual: ing.cantidadActual || 0, cantidadMinima: ing.cantidadMinima || 0,
-      precioUsd: ing.precioUsd || 0, proveedor: ing.proveedor || '',
-      notas: ing.notas || '', esAccesorio: ing.esAccesorio || false
+      precioUsd: ing.precioUsd || 0, cantidadPorCompra: ing.cantidadPorCompra || 1,
+      proveedor: ing.proveedor || '', notas: ing.notas || '', esAccesorio: ing.esAccesorio || false
     })
     setEditingId(ing.id)
     setFormMsg(null)
@@ -87,7 +93,8 @@ export function InventarioPage() {
         ...form,
         cantidadActual: parseFloat(form.cantidadActual) || 0,
         cantidadMinima: parseFloat(form.cantidadMinima) || 0,
-        precioUsd: parseFloat(form.precioUsd) || 0
+        precioUsd: parseFloat(form.precioUsd) || 0,
+        cantidadPorCompra: parseFloat(form.cantidadPorCompra) || 1
       }
       if (editingId) {
         await ingredientesApi.update(activeWorkspaceId, editingId, payload)
@@ -116,12 +123,60 @@ export function InventarioPage() {
     } catch (err) { alert(err.message) }
   }
 
+  // Precio inline editable
+  const startEditPrecio = (id, precioActual) => {
+    setPrecioEdits(p => ({ ...p, [id]: { editing: true, value: String(precioActual) } }))
+  }
+  const setPrecioVal = (id, val) => {
+    setPrecioEdits(p => ({ ...p, [id]: { ...p[id], value: val } }))
+  }
+  const commitPrecio = async (id) => {
+    const edit = precioEdits[id]
+    if (!edit) return
+    const nuevoPrecio = parseFloat(edit.value)
+    if (isNaN(nuevoPrecio) || nuevoPrecio < 0) {
+      setPrecioEdits(p => { const n = { ...p }; delete n[id]; return n })
+      return
+    }
+    try {
+      const updated = await ingredientesApi.patch(activeWorkspaceId, id, { precioUsd: nuevoPrecio })
+      setIngredientes(prev => prev.map(i => i.id === id ? updated : i))
+      setActualizados(prev => new Set([...prev, id]))
+    } catch (err) { alert(err.message) }
+    setPrecioEdits(p => { const n = { ...p }; delete n[id]; return n })
+  }
+
+  const recalcularRecetas = async () => {
+    try {
+      const recetas = await recetasApi.list(activeWorkspaceId)
+      const afectadas = recetas.filter(r =>
+        r.ingredientes?.some(ri => actualizados.has(ri.ingredienteId))
+      )
+      setRecalcMsg(`${afectadas.length} receta(s) tienen ingredientes con precio actualizado. Sus costos se recalcularán al abrir cada receta.`)
+      setActualizados(new Set())
+    } catch { setRecalcMsg('No se pudo verificar las recetas afectadas') }
+  }
+
   return (
     <div style={pg.page}>
       <div style={pg.header}>
         <h1 style={pg.title}>Inventario</h1>
-        <button style={pg.btnPrimary} onClick={openCreate}>+ Agregar</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {actualizados.size > 0 && (
+            <button style={{ ...pg.btnSecondary, background: '#fffbeb', color: '#92400e', border: '1px solid #fbbf24' }}
+              onClick={recalcularRecetas}>
+              ⚠️ Recalcular recetas ({actualizados.size} precio{actualizados.size > 1 ? 's' : ''} cambiado{actualizados.size > 1 ? 's' : ''})
+            </button>
+          )}
+          <button style={pg.btnPrimary} onClick={openCreate}>+ Agregar</button>
+        </div>
       </div>
+      {recalcMsg && (
+        <div style={{ background: '#f0faf5', border: '1px solid #2D6A4F', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#2D6A4F', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>{recalcMsg}</span>
+          <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#2D6A4F', fontWeight: 700 }} onClick={() => setRecalcMsg(null)}>✕</button>
+        </div>
+      )}
 
       {/* Filtros */}
       <div style={s.filterRow}>
@@ -153,8 +208,16 @@ export function InventarioPage() {
             <Field label="Cantidad actual" type="number" value={form.cantidadActual} onChange={set('cantidadActual')} />
             <Field label="Cantidad mínima" type="number" value={form.cantidadMinima} onChange={set('cantidadMinima')} />
           </div>
-          <div style={s.row2}>
-            <Field label="Precio USD ($)" type="number" value={form.precioUsd} onChange={set('precioUsd')} />
+          <div style={s.row3}>
+            <Field label="Precio del paquete (USD)" type="number" value={form.precioUsd} onChange={set('precioUsd')} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <Field label={`Cantidad por paquete (ej: 900 si es bolsa de 900${form.unidad})`} type="number" value={form.cantidadPorCompra} onChange={set('cantidadPorCompra')} />
+              {form.precioUsd > 0 && form.cantidadPorCompra > 0 && (
+                <span style={{ fontSize: 11, color: '#7B61C4', fontWeight: 500 }}>
+                  Costo unitario: ${(parseFloat(form.precioUsd) / parseFloat(form.cantidadPorCompra)).toFixed(4)}/{form.unidad || 'u'}
+                </span>
+              )}
+            </div>
             <Field label="Proveedor" value={form.proveedor} onChange={set('proveedor')} />
           </div>
           <Field label="Notas" value={form.notas} onChange={set('notas')} multiline />
@@ -179,7 +242,7 @@ export function InventarioPage() {
           <table style={pg.table}>
             <thead>
               <tr>
-                {['Ingrediente', 'Categoría', 'Stock actual', 'Mínimo', 'Precio/u (USD)', 'Estado', 'Ajuste rápido'].map(h => (
+                {['Ingrediente', 'Categoría', 'Stock actual', 'Mínimo', 'Paquete (USD)', 'Costo unitario', 'Estado', 'Ajuste rápido'].map(h => (
                   <th key={h} style={pg.th}>{h}</th>
                 ))}
               </tr>
@@ -199,7 +262,28 @@ export function InventarioPage() {
                       {i.cantidadActual}{i.unidad}
                     </td>
                     <td style={pg.td}>{i.cantidadMinima}{i.unidad}</td>
-                    <td style={pg.td}>${i.precioUsd?.toFixed(3)}</td>
+                    <td style={pg.td}>
+                      {precioEdits[i.id]?.editing ? (
+                        <input
+                          style={{ ...s.stockInput, width: 72 }}
+                          type="number"
+                          step="0.01"
+                          autoFocus
+                          value={precioEdits[i.id].value}
+                          onChange={e => setPrecioVal(i.id, e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') commitPrecio(i.id); if (e.key === 'Escape') setPrecioEdits(p => { const n = { ...p }; delete n[i.id]; return n }) }}
+                          onBlur={() => commitPrecio(i.id)}
+                        />
+                      ) : (
+                        <button style={{ ...s.btnLink, fontSize: 13 }} title="Click para editar precio"
+                          onClick={() => startEditPrecio(i.id, i.precioUsd)}>
+                          ${i.precioUsd?.toFixed(2)} / {i.cantidadPorCompra || 1}{i.unidad}
+                        </button>
+                      )}
+                    </td>
+                    <td style={{ ...pg.td, color: '#7B61C4', fontWeight: 500 }}>
+                      ${((i.precioUsd || 0) / (i.cantidadPorCompra || 1)).toFixed(4)}/{i.unidad}
+                    </td>
                     <td style={pg.td}>
                       {bajo ? <span style={pg.tagDanger}>Bajo stock</span> : <span style={pg.tagOk}>OK</span>}
                     </td>

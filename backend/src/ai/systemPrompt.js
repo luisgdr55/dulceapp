@@ -20,7 +20,7 @@ export async function buildSystemPrompt(workspaceId) {
     // Traer todos los ingredientes y filtrar stock bajo en JS (SQLite no soporta WHERE col1 <= col2)
     prisma.ingrediente.findMany({
       where: { workspaceId },
-      select: { id: true, nombre: true, cantidadActual: true, cantidadMinima: true, unidad: true }
+      select: { id: true, nombre: true, cantidadActual: true, cantidadMinima: true, unidad: true, precioUsd: true, cantidadPorCompra: true }
     }),
     prisma.pedido.findMany({
       where: { workspaceId, estado: { in: ['PENDIENTE', 'EN_PROCESO'] } },
@@ -67,6 +67,12 @@ ${recetas.map(r => {
     ? ` | Variantes: ${r.variantes.map(v => `${v.nombre} (${v.precioEur}€)`).join(', ')}`
     : ''
   return `- [${r.id}] ${r.nombre} — ${r.precioVentaEur}€ (costo: ${r.costoTotalEur}€, margen: ${r.margenGanancia.toFixed(0)}%)${variantes}`
+}).join('\n')}
+
+INGREDIENTES (${ingredientesAll.length} en inventario — incluir en actualizaciones de precio):
+${ingredientesAll.map(i => {
+  const costoUnitario = (i.precioUsd / (i.cantidadPorCompra || 1)).toFixed(4)
+  return `- [${i.id}] ${i.nombre}: stock ${i.cantidadActual}${i.unidad}, precio $${i.precioUsd}/${i.cantidadPorCompra || 1}${i.unidad} = $${costoUnitario}/${i.unidad}`
 }).join('\n')}
 
 ALERTAS DE STOCK BAJO (${stockBajo.length}):

@@ -48,7 +48,8 @@ router.post('/', requireWorkspace('EDITOR'), async (req, res) => {
       unidad:         z.string().min(1),
       cantidadActual: z.number().min(0).default(0),
       cantidadMinima: z.number().min(0).default(0),
-      precioUsd:      z.number().min(0),
+      precioUsd:           z.number().min(0),
+      cantidadPorCompra:   z.number().positive().default(1),
       proveedor:      z.string().optional(),
       notas:          z.string().optional(),
       esAccesorio:    z.boolean().default(false)
@@ -105,6 +106,24 @@ router.put('/:id', requireWorkspace('EDITOR'), async (req, res) => {
     })
   }
 
+  res.json(updated)
+})
+
+// PATCH /api/ingredientes/:id — actualización parcial (precio, cantidadPorCompra, etc.)
+router.patch('/:id', requireWorkspace('EDITOR'), async (req, res) => {
+  const existing = await prisma.ingrediente.findFirst({
+    where: { id: req.params.id, workspaceId: req.workspaceId }
+  })
+  if (!existing) return res.status(404).json({ error: 'Ingrediente no encontrado' })
+
+  const allowed = ['precioUsd', 'cantidadPorCompra', 'cantidadActual', 'cantidadMinima', 'proveedor', 'notas']
+  const updates = Object.fromEntries(
+    Object.entries(req.body).filter(([k]) => allowed.includes(k))
+  )
+  const updated = await prisma.ingrediente.update({
+    where: { id: req.params.id },
+    data: updates
+  })
   res.json(updated)
 })
 

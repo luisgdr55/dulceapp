@@ -61,7 +61,9 @@ router.post('/', requireWorkspace('EDITOR'), async (req, res) => {
       imagenUrl: z.string().optional(),
       porciones: z.number().int().min(1).default(1),
       tiempoPrep: z.number().int().optional(),
+      tiempoElaboracion: z.number().int().optional(),
       costoIngredientesUsd: z.number().min(0).default(0),
+      costoManoDeObraEur: z.number().min(0).default(0),
       costoGasEur: z.number().min(0).default(0),
       costoEmpaqueEur: z.number().min(0).default(0),
       precioVentaEur: z.number().min(0).default(0),
@@ -78,8 +80,25 @@ router.post('/', requireWorkspace('EDITOR'), async (req, res) => {
       prisma.tasaBCV.findFirst({ where: { workspaceId: req.workspaceId, esCurrent: true, moneda: 'EUR' } })
     ])
     const usdToEur = (tasaUSD?.tasa && tasaEUR?.tasa) ? tasaUSD.tasa / tasaEUR.tasa : 1
-    const costoIngredientesEnEur = data.costoIngredientesUsd * usdToEur
-    const costoTotal = costoIngredientesEnEur + data.costoGasEur + data.costoEmpaqueEur
+
+    // Si se envían ingredientes, recalcular costoIngredientesUsd desde precios reales
+    let costoIngredientesUsd = data.costoIngredientesUsd
+    if (data.ingredientes?.length) {
+      const ingsDb = await prisma.ingrediente.findMany({
+        where: { id: { in: data.ingredientes.map(i => i.ingredienteId) }, workspaceId: req.workspaceId },
+        select: { id: true, precioUsd: true, cantidadPorCompra: true }
+      })
+      const ingsMap = Object.fromEntries(ingsDb.map(i => [i.id, i]))
+      costoIngredientesUsd = data.ingredientes.reduce((sum, item) => {
+        const ing = ingsMap[item.ingredienteId]
+        if (!ing) return sum
+        const costoUnitario = ing.precioUsd / (ing.cantidadPorCompra || 1)
+        return sum + costoUnitario * item.cantidad
+      }, 0)
+    }
+
+    const costoIngredientesEnEur = costoIngredientesUsd * usdToEur
+    const costoTotal = costoIngredientesEnEur + data.costoManoDeObraEur + data.costoGasEur + data.costoEmpaqueEur
     const margenGanancia = data.precioVentaEur > 0
       ? ((data.precioVentaEur - costoTotal) / data.precioVentaEur) * 100
       : 0
@@ -93,7 +112,9 @@ router.post('/', requireWorkspace('EDITOR'), async (req, res) => {
         imagenUrl: data.imagenUrl,
         porciones: data.porciones,
         tiempoPrep: data.tiempoPrep,
-        costoIngredientesUsd: data.costoIngredientesUsd,
+        tiempoElaboracion: data.tiempoElaboracion,
+        costoIngredientesUsd: costoIngredientesUsd,
+        costoManoDeObraEur: data.costoManoDeObraEur,
         costoGasEur: data.costoGasEur,
         costoEmpaqueEur: data.costoEmpaqueEur,
         costoTotalEur: costoTotal,
@@ -133,9 +154,27 @@ router.put('/:id', requireWorkspace('EDITOR'), async (req, res) => {
       prisma.tasaBCV.findFirst({ where: { workspaceId: req.workspaceId, esCurrent: true, moneda: 'EUR' } })
     ])
     const usdToEur = (tasaUSD?.tasa && tasaEUR?.tasa) ? tasaUSD.tasa / tasaEUR.tasa : 1
-    const costoUsd = rest.costoIngredientesUsd ?? existing.costoIngredientesUsd
+
+    // Si se envían ingredientes, recalcular costoIngredientesUsd desde precios reales
+    let costoUsd = rest.costoIngredientesUsd ?? existing.costoIngredientesUsd
+    if (ingredientes?.length) {
+      const ingsDb = await prisma.ingrediente.findMany({
+        where: { id: { in: ingredientes.map(i => i.ingredienteId) }, workspaceId: req.workspaceId },
+        select: { id: true, precioUsd: true, cantidadPorCompra: true }
+      })
+      const ingsMap = Object.fromEntries(ingsDb.map(i => [i.id, i]))
+      costoUsd = ingredientes.reduce((sum, item) => {
+        const ing = ingsMap[item.ingredienteId]
+        if (!ing) return sum
+        const costoUnitario = ing.precioUsd / (ing.cantidadPorCompra || 1)
+        return sum + costoUnitario * item.cantidad
+      }, 0)
+      rest.costoIngredientesUsd = costoUsd
+    }
+
     const costoIngredientesEnEur = costoUsd * usdToEur
     const costoTotal = costoIngredientesEnEur
+      + (rest.costoManoDeObraEur ?? existing.costoManoDeObraEur ?? 0)
       + (rest.costoGasEur ?? existing.costoGasEur)
       + (rest.costoEmpaqueEur ?? existing.costoEmpaqueEur)
 

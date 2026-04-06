@@ -25,12 +25,12 @@ router.get('/:workspaceId/config', requireWorkspace('VIEWER'), async (req, res) 
 
 // PUT /api/workspaces/:workspaceId/config
 router.put('/:workspaceId/config', requireWorkspace('OWNER'), async (req, res) => {
-  const { nombre, apellido, negocio, ciudad, email, telefono, monedaPrincipal } = req.body
+  const { nombre, apellido, negocio, ciudad, email, telefono, monedaPrincipal, tarifaHoraEur } = req.body
 
   const config = await prisma.businessConfig.upsert({
     where: { workspaceId: req.workspaceId },
-    create: { workspaceId: req.workspaceId, nombre, apellido, negocio, ciudad, email, telefono, monedaPrincipal },
-    update: { nombre, apellido, negocio, ciudad, email, telefono, monedaPrincipal }
+    create: { workspaceId: req.workspaceId, nombre, apellido, negocio, ciudad, email, telefono, monedaPrincipal, tarifaHoraEur: tarifaHoraEur ?? 5.0 },
+    update: { nombre, apellido, negocio, ciudad, email, telefono, monedaPrincipal, ...(tarifaHoraEur !== undefined && { tarifaHoraEur: parseFloat(tarifaHoraEur) }) }
   })
 
   // Sincronizar nombre del workspace

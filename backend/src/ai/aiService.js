@@ -145,6 +145,31 @@ const TOOLS = [
       description: 'Lista los ingredientes por debajo del stock mínimo',
       parameters: { type: 'object', properties: {} }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'actualizar_precio_ingrediente',
+      description: 'Actualiza el precio USD de uno o varios ingredientes y recalcula automáticamente los costos de todas las recetas afectadas. Crea alertas si el margen de alguna receta baja del 15%.',
+      parameters: {
+        type: 'object',
+        properties: {
+          actualizaciones: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                ingredienteId:          { type: 'string', description: 'ID del ingrediente' },
+                nuevoPrecioUsd:         { type: 'number', description: 'Nuevo precio del paquete en USD' },
+                nuevaCantidadPorCompra: { type: 'number', description: 'Opcional: nuevo tamaño del paquete si cambió' }
+              },
+              required: ['ingredienteId', 'nuevoPrecioUsd']
+            }
+          }
+        },
+        required: ['actualizaciones']
+      }
+    }
   }
 ]
 
