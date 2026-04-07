@@ -1,5 +1,5 @@
 #!/bin/sh
 echo "=== DULCEAPP Backend ==="
-echo "NODE_ENV: ${NODE_ENV:-production}"
-echo "PORT: ${PORT:-3000}"
+npx prisma db push --accept-data-loss --skip-generate
+echo "DB sincronizada. Iniciando servidor..."
 exec node src/index.js
